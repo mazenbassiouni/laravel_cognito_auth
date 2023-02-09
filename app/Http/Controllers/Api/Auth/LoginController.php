@@ -109,7 +109,7 @@ class LoginController extends Controller
             ]);
         }
 
-        $keysResponse = Http::get('https://cognito-idp.us-east-1.amazonaws.com/us-east-1_brssXjLW9/.well-known/jwks.json');
+        $keysResponse = Http::get('https://cognito-idp.'.env('COGNITO_REGION').'.amazonaws.com/'.env('COGNITO_POOL_ID').'/.well-known/jwks.json');
         $publicKeys = collect($keysResponse->object()->keys);
         $key = $publicKeys->where('kid', $header->kid)->first();
         if(!$key){
