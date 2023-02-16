@@ -9,6 +9,8 @@ use Laravel\Socialite\Facades\Socialite;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use JOSE_JWK;
+use JOSE_JWT;
 
 class LoginController extends Controller
 {
@@ -87,6 +89,20 @@ class LoginController extends Controller
         $payload = json_decode(base64_decode($sections[1]));
         $signature = $sections[2];
 
+        $keysResponse = Http::get('https://cognito-idp.'.env('COGNITO_REGION').'.amazonaws.com/'.env('COGNITO_POOL_ID').'/.well-known/jwks.json');
+        $publicKeys = collect($keysResponse->object()->keys);
+        $key = $publicKeys->where('kid', $header->kid)->first();
+        if(!$key){
+            return response()->json([
+                'error' => 'invalid_token',
+                'error_description' => 'Invalid public key'
+            ]);
+        }
+
+        $jws = JOSE_JWT::decode($token);
+        $public_key = JOSE_JWK::decode((array) $key);
+        $jws->verify($public_key, 'RS256');
+
         if($payload->aud != env('COGNITO_CLIENT_ID')){
             return response()->json([
                 'error' => 'invalid_token',
@@ -106,16 +122,6 @@ class LoginController extends Controller
             return response()->json([
                 'error' => 'invalid_token',
                 'error_description' => 'Token expired'
-            ]);
-        }
-
-        $keysResponse = Http::get('https://cognito-idp.'.env('COGNITO_REGION').'.amazonaws.com/'.env('COGNITO_POOL_ID').'/.well-known/jwks.json');
-        $publicKeys = collect($keysResponse->object()->keys);
-        $key = $publicKeys->where('kid', $header->kid)->first();
-        if(!$key){
-            return response()->json([
-                'error' => 'invalid_token',
-                'error_description' => 'Invalid public key'
             ]);
         }
 
